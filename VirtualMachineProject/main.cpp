@@ -17,22 +17,32 @@
 
 int main() {
 	
-	omp_set_num_threads(1);
+	omp_set_num_threads(0);
 	using LockType = MemorySpinlock;
 	//using LockType = std::mutex;
 
 
+//	std::atomic_size_t testcounter = 0;
+//#pragma omp parallel for
+//	for (int64_t i = 0; i < 512; i++)
+//		for (int64_t j = 0; j < 100000; j++)
+//			testcounter++;
+//
+//	std::cout << "testcounter: " << testcounter << "\n";;
+//	//omp_set_num_threads(1);
+
+
 	//using MemPoolAllocator = MemoryChunkPoolAllocator;
 	using MemPoolAllocator = MemoryPoolAllocatorInterface;
-MemoryManager<MemPoolAllocator> mmm;
-const size_t TABSIZE =  1024 * 1024 * 128 * 0.125 * 1;
-	const size_t ELSIZEMIN = 24;
+	//MemoryManager<MemPoolAllocator> mmm;
+	const size_t TABSIZE = 1024 * 1024 * 128 * 0.125 * 2.0;
+	const size_t ELSIZEMIN = 16;
 	const size_t ELSIZESIZE =1;
 	uint64_t SEED = 1234324;
 
 	std::cout << "hello\n";
 
-	size_t randomTestIteration = 1024*0.25;
+	size_t randomTestIteration = 1024 * 4.00;
 
 	std::atomic_size_t mysumsize = 0, mymaxsumsize = 0;
 	std::atomic_size_t newsumsize = 0, newmaxsumsize = 0;
@@ -99,14 +109,15 @@ const size_t TABSIZE =  1024 * 1024 * 128 * 0.125 * 1;
 	}
 	*/
 	std::vector<uint8_t*> ptrs(TABSIZE, 0);
-
+	/**/
 	std::cout << "serial tests:\n";
-	
+	//for(int isize = 1; isize < 100000; isize  = isize*1.1+1)
 	{
+		//std::cout << "isize: " << isize << "\n";;
 		std::mt19937_64 rng(SEED);
-		std::cout << "BEFORE my allocation\n"; Sleep(2000);// std::cin >> aaaaaa;
-		//MemoryManagerParallel<MemPoolAllocator, MemPoolAllocator, LockType> mem;
-		MemoryManager<MemPoolAllocator> mem;
+				std::cout << "BEFORE my allocation\n"; Sleep(2000);// std::cin >> aaaaaa;
+		MemoryManagerParallel<MemPoolAllocator, MemPoolAllocator, LockType> mem;
+		//MemoryManager<MemPoolAllocator> mem;
 
 		t0 = std::chrono::steady_clock::now();
 #pragma omp parallel for
@@ -119,10 +130,10 @@ const size_t TABSIZE =  1024 * 1024 * 128 * 0.125 * 1;
 			for (size_t j = 0; j < size; j += 16)
 				ptrs[i][j] = i * j;
 		}
-		t1 = std::chrono::steady_clock::now();
+				t1 = std::chrono::steady_clock::now();
 	
 		std::cout << "COUNTER = " << counterrrrrr << "\n";
-		std::cout << "BEFORE my deallocation\n"; Sleep(2000); //std::cin >> aaaaaa;
+				std::cout << "BEFORE my deallocation\n"; Sleep(2000); //std::cin >> aaaaaa;
 		t2 = std::chrono::steady_clock::now();
 #pragma omp parallel for
 		for (intptr_t i = 0; i < ptrs.size(); i++)
@@ -131,7 +142,7 @@ const size_t TABSIZE =  1024 * 1024 * 128 * 0.125 * 1;
 			ptrs[i] = nullptr;
 		}
 		mem.clean(true);
-		t3 = std::chrono::steady_clock::now();
+				t3 = std::chrono::steady_clock::now();
 		std::cout << "BEFORE destroyng MemoryManager\n"; Sleep(2000); //std::cin >> aaaaaa;
 	}
 	
@@ -200,8 +211,8 @@ const size_t TABSIZE =  1024 * 1024 * 128 * 0.125 * 1;
 	{
 		
 		std::cout << "BEFORE my allocation\n"; Sleep(2000);// std::cin >> aaaaaa;
-		//MemoryManagerParallel<MemPoolAllocator, MemPoolAllocator, LockType> mem;
-		MemoryManager<MemPoolAllocator> mem;
+		MemoryManagerParallel<MemPoolAllocator, MemPoolAllocator, LockType> mem;
+		//MemoryManager<MemPoolAllocator> mem;
 		t0 = std::chrono::steady_clock::now();
 #pragma omp parallel for
 		for (intptr_t iteration = 0; iteration < randomTestIteration; iteration++)
@@ -223,13 +234,15 @@ const size_t TABSIZE =  1024 * 1024 * 128 * 0.125 * 1;
 					//mymaxsumsize = std::max(mysumsize, mymaxsumsize);
 					ptrs[index] = mem.alloc(size);
 					//assert(mem.correctnessTest());
-					//counterrrrrr++;
+					counterrrrrr++;
 					for (size_t j = 0; j < size; j+=16)
 						ptrs[index][j] = i * j;
 				}
 			}
 			for (int i = 0; i < deallocationTries; i++)
 			{
+				//if (i == 61433)
+				//	std::cout << "THIS ITERATION";;
 				size_t index = (rng() % (ptrs.size() / threadsCount - 1)) * threadsCount + threadID; //auto index = rng() % ptrs.size();
 				if (ptrs[index] != nullptr)
 				{
@@ -265,9 +278,11 @@ const size_t TABSIZE =  1024 * 1024 * 128 * 0.125 * 1;
 		std::mt19937_64 rng(SEED);
 		std::cout << "BEFORE new allocation\n"; Sleep(2000); //std::cin >> aaaaaa;
 		t4 = std::chrono::steady_clock::now();
+		auto cntrptr = &counterrrrrr;
 #pragma omp parallel for
 		for (intptr_t iteration = 0; iteration < randomTestIteration; iteration++)
 		{
+			
 			auto threadsCount = omp_get_num_threads();
 			auto threadID = omp_get_thread_num();
 			std::mt19937_64 rng(SEED + iteration);
@@ -281,7 +296,9 @@ const size_t TABSIZE =  1024 * 1024 * 128 * 0.125 * 1;
 				{
 					size_t size = (rng() % ELSIZESIZE + ELSIZEMIN);
 					newsumsize += size;
+					
 					ptrs[index] = new uint8_t[size];
+					(*cntrptr)++;
 					for (size_t j = 0; j < size; j+=16)
 						ptrs[index][j] = i * j;
 				}
@@ -293,11 +310,12 @@ const size_t TABSIZE =  1024 * 1024 * 128 * 0.125 * 1;
 				{
 					delete[](ptrs[index]);
 					ptrs[index] = nullptr;
+					(*cntrptr)--;
 				}
 			}
 		}
 		t5 = std::chrono::steady_clock::now();
-
+		std::cout << "COUNTER = " << counterrrrrr << "\n";
 		std::cout << "BEFORE new deallocation\n"; Sleep(2000); //std::cin >> aaaaaa;
 
 		t6 = std::chrono::steady_clock::now();

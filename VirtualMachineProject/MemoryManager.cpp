@@ -1,4 +1,4 @@
 #include "MemoryManager.h"
 
-MemoryManager<MemoryPoolAllocatorInterface> globalMemoryManagerWithPoolAllocInterface;
+//MemoryManager<MemoryPoolAllocatorInterface> globalMemoryManagerWithPoolAllocInterface;
 //MemoryManager<MemoryChunkPoolAllocator> globalMemoryManagerWithChunkPoolAlloc;

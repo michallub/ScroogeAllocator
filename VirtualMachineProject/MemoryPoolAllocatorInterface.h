@@ -1,14 +1,14 @@
 #pragma once
-#include <cstdint>
+//#include <cstdint>
 #include <cstdlib>
 class MemoryPoolAllocatorInterface
 {
 public:
-	uint8_t* alloc(size_t size) noexcept
+	void* alloc(size_t size) noexcept
 	{
-		return (uint8_t*)std::malloc(size);
+		return (void*)std::malloc(size);
 	}
-	void dealloc(uint8_t* ptr) noexcept
+	void dealloc(void* ptr) noexcept
 	{
 		return std::free(ptr);
 	}

@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cassert>
 
+/*
 static constexpr std::pair< MemoryRange, size_t> elementSize_perChunk_Table[] = {
 		{{    0,     1}, 4096},
 		{{    2,     2}, 4096},
@@ -112,6 +113,134 @@ static constexpr std::pair< MemoryRange, size_t> elementSize_perChunk_Table[] = 
 		{{15361, 16384},    4},
 		{{16385, size_t(-1)},    1}
 	};
+	
+
+
+	*/
+
+enum class MemoryChunkType {
+	Precise,
+	VerySmall,
+	Small,
+	Medium,
+	Large,
+	AnySize
+};
+
+struct MemorySizeRangeInfo {
+	MemoryRange range;
+	size_t elPerChunk;
+	MemoryChunkType chunkType;
+	size_t buforSize;
+};
+
+static constexpr MemorySizeRangeInfo elementSize_perChunk_Table[] = {
+	{{0, 1}, 4096, MemoryChunkType::Precise, 4096 },
+	{{ 2, 2 }, 4096, MemoryChunkType::Precise, 8192},
+	{{ 3, 3 }, 2688, MemoryChunkType::Precise, 8192},
+	{{ 4, 4 }, 4096, MemoryChunkType::Precise, 16384},
+	{{ 5, 5 }, 3264, MemoryChunkType::Precise, 16384},
+	{{ 6, 6 }, 2688, MemoryChunkType::Precise, 16384},
+	{{ 7, 7 }, 2304, MemoryChunkType::Precise, 16384},
+	{{ 8, 8 }, 4096, MemoryChunkType::Precise, 32768},
+	{{ 9, 9 }, 3584, MemoryChunkType::Precise, 32768},
+	{{ 10, 10 }, 3264, MemoryChunkType::Precise, 32768},
+	{{ 11, 11 }, 2944, MemoryChunkType::Precise, 32768},
+	{{ 12, 12 }, 2688, MemoryChunkType::Precise, 32768},
+	{{ 13, 13 }, 2496, MemoryChunkType::Precise, 32768},
+	{{ 14, 14 }, 2304, MemoryChunkType::Precise, 32768},
+	{{ 15, 15 }, 2176, MemoryChunkType::Precise, 32768},
+	{{ 16, 16 }, 4096, MemoryChunkType::Precise, 65536},
+	{{ 17, 18 }, 1792, MemoryChunkType::VerySmall, 32768},
+	{{ 19, 20 }, 1600, MemoryChunkType::VerySmall, 32768},
+	{{ 21, 22 }, 1472, MemoryChunkType::VerySmall, 32768},
+	{{ 23, 24 }, 1344, MemoryChunkType::VerySmall, 32768},
+	{{ 25, 26 }, 1216, MemoryChunkType::VerySmall, 32768},
+	{{ 27, 28 }, 1152, MemoryChunkType::VerySmall, 32768},
+	{{ 29, 30 }, 1088, MemoryChunkType::VerySmall, 32768},
+	{{ 31, 32 }, 2048, MemoryChunkType::VerySmall, 65536},
+	{{ 33, 36 }, 1792, MemoryChunkType::VerySmall, 65536},
+	{{ 37, 40 }, 1600, MemoryChunkType::VerySmall, 65536},
+	{{ 41, 44 }, 1472, MemoryChunkType::VerySmall, 65536},
+	{{ 45, 48 }, 1344, MemoryChunkType::VerySmall, 65536},
+	{{ 49, 52 }, 1216, MemoryChunkType::VerySmall, 65536},
+	{{ 53, 56 }, 1152, MemoryChunkType::VerySmall, 65536},
+	{{ 57, 60 }, 1088, MemoryChunkType::VerySmall, 65536},
+	{{ 61, 64 }, 2048, MemoryChunkType::VerySmall, 131072},
+	{{ 65, 72 }, 896, MemoryChunkType::Small, 65536},
+	{{ 73, 80 }, 768, MemoryChunkType::Small, 65536},
+	{{ 81, 88 }, 704, MemoryChunkType::Small, 65536},
+	{{ 89, 96 }, 640, MemoryChunkType::Small, 65536},
+	{{ 97, 104 }, 576, MemoryChunkType::Small, 65536},
+	{{ 105, 112 }, 576, MemoryChunkType::Small, 65536},
+	{{ 113, 120 }, 512, MemoryChunkType::Small, 65536},
+	{{ 121, 128 }, 1024, MemoryChunkType::Small, 131072},
+	{{ 129, 144 }, 896, MemoryChunkType::Small, 131072},
+	{{ 145, 160 }, 768, MemoryChunkType::Small, 131072},
+	{{ 161, 176 }, 704, MemoryChunkType::Small, 131072},
+	{{ 177, 192 }, 640, MemoryChunkType::Small, 131072},
+	{{ 193, 208 }, 576, MemoryChunkType::Small, 131072},
+	{{ 209, 224 }, 576, MemoryChunkType::Small, 131072},
+	{{ 225, 240 }, 512, MemoryChunkType::Small, 131072},
+	{{ 241, 256 }, 512, MemoryChunkType::Small, 131072},
+	{{ 257, 272 }, 448, MemoryChunkType::Small, 131072},
+	{{ 273, 288 }, 448, MemoryChunkType::Small, 131072},
+	{{ 289, 304 }, 832, MemoryChunkType::Small, 262144},
+	{{ 305, 320 }, 384, MemoryChunkType::Small, 131072},
+	{{ 321, 336 }, 384, MemoryChunkType::Small, 131072},
+	{{ 337, 352 }, 704, MemoryChunkType::Small, 262144},
+	{{ 353, 368 }, 704, MemoryChunkType::Small, 262144},
+	{{ 369, 384 }, 320, MemoryChunkType::Small, 131072},
+	{{ 385, 400 }, 320, MemoryChunkType::Small, 131072},
+	{{ 401, 416 }, 576, MemoryChunkType::Small, 262144},
+	{{ 417, 432 }, 576, MemoryChunkType::Small, 262144},
+	{{ 433, 448 }, 576, MemoryChunkType::Small, 262144},
+	{{ 449, 464 }, 256, MemoryChunkType::Small, 131072},
+	{{ 465, 480 }, 256, MemoryChunkType::Small, 131072},
+	{{ 481, 496 }, 256, MemoryChunkType::Small, 131072},
+	{{ 497, 512 }, 256, MemoryChunkType::Small, 131072},
+	{{ 513, 576 }, 56, MemoryChunkType::Medium, 32768},
+	{{ 577, 640 }, 51, MemoryChunkType::Medium, 32768},
+	{{ 641, 704 }, 46, MemoryChunkType::Medium, 32768},
+	{{ 705, 768 }, 42, MemoryChunkType::Medium, 32768},
+	{{ 769, 832 }, 39, MemoryChunkType::Medium, 32768},
+	{{ 833, 896 }, 36, MemoryChunkType::Medium, 32768},
+	{{ 897, 960 }, 34, MemoryChunkType::Medium, 32768},
+	{{ 961, 1024 }, 64, MemoryChunkType::Medium, 65536},
+	{{ 1025, 1152 }, 56, MemoryChunkType::Medium, 65536},
+	{{ 1153, 1280 }, 51, MemoryChunkType::Medium, 65536},
+	{{ 1281, 1408 }, 46, MemoryChunkType::Medium, 65536},
+	{{ 1409, 1536 }, 42, MemoryChunkType::Medium, 65536},
+	{{ 1537, 1664 }, 39, MemoryChunkType::Medium, 65536},
+	{{ 1665, 1792 }, 36, MemoryChunkType::Medium, 65536},
+	{{ 1793, 1920 }, 34, MemoryChunkType::Medium, 65536},
+	{{ 1921, 2048 }, 64, MemoryChunkType::Medium, 131072},
+	{{ 2049, 2304 }, 56, MemoryChunkType::Medium, 131072},
+	{{ 2305, 2560 }, 51, MemoryChunkType::Medium, 131072},
+	{{ 2561, 2816 }, 46, MemoryChunkType::Medium, 131072},
+	{{ 2817, 3072 }, 42, MemoryChunkType::Medium, 131072},
+	{{ 3073, 3328 }, 39, MemoryChunkType::Medium, 131072},
+	{{ 3329, 3584 }, 36, MemoryChunkType::Medium, 131072},
+	{{ 3585, 3840 }, 34, MemoryChunkType::Medium, 131072},
+	{{ 3841, 4096 }, 32, MemoryChunkType::Medium, 131072},
+	{{ 4097, 4608 }, 14, MemoryChunkType::Large, 65536},
+	{{ 4609, 5120 }, 12, MemoryChunkType::Large, 65536},
+	{{ 5121, 5632 }, 11, MemoryChunkType::Large, 65536},
+	{{ 5633, 6144 }, 10, MemoryChunkType::Large, 65536},
+	{{ 6145, 6656 }, 9, MemoryChunkType::Large, 65536},
+	{{ 6657, 7168 }, 9, MemoryChunkType::Large, 65536},
+	{{ 7169, 7680 }, 8, MemoryChunkType::Large, 65536},
+	{{ 7681, 8192 }, 16, MemoryChunkType::Large, 131072},
+	{{ 8193, 9216 }, 14, MemoryChunkType::Large, 131072},
+	{{ 9217, 10240 }, 12, MemoryChunkType::Large, 131072},
+	{{ 10241, 11264 }, 11, MemoryChunkType::Large, 131072},
+	{{ 11265, 12288 }, 10, MemoryChunkType::Large, 131072},
+	{{ 12289, 13312 }, 9, MemoryChunkType::Large, 131072},
+	{{ 13313, 14336 }, 9, MemoryChunkType::Large, 131072},
+	{{ 14337, 15360 }, 8, MemoryChunkType::Large, 131072},
+	{{ 15361, 16384 }, 8, MemoryChunkType::Large, 131072},
+	{{16385, size_t(-1)}, 1, MemoryChunkType::AnySize,-1}
+};
 
 constexpr uint8_t indexTranslationTable[] = {
 		0,
@@ -1150,14 +1279,14 @@ constexpr uint8_t getSizeBucket(size_t size)
 	return indexTranslationTable[size < tabsize ? size : tabsize - 1];
 }
 
-constexpr std::pair< MemoryRange, size_t> getBucketRange(uint8_t bucket) 
+constexpr MemorySizeRangeInfo getBucketRange(uint8_t bucket)
 {
 	constexpr size_t tabsize = (sizeof(elementSize_perChunk_Table) / sizeof(elementSize_perChunk_Table[0]));
 	assert(bucket< tabsize);
 	return elementSize_perChunk_Table[bucket];
 }
 
-constexpr std::pair< MemoryRange, size_t> getSizeRange(size_t size) {
+constexpr MemorySizeRangeInfo getSizeRange(size_t size) {
 	
 	return getBucketRange(getSizeBucket(size));
 }

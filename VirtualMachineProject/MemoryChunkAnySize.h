@@ -2,13 +2,14 @@
 #include "MemoryChunkBase.h"
 #include <cassert>
 
-template<class PoolAllocatorType>
+template<class MemoryManagerType>
 class MemoryChunkAnySize :
-    public MemoryChunkBase<PoolAllocatorType>
+    public MemoryChunkBase<MemoryManagerType>
 {
+	size_t elementSize;
 public:
-	MemoryChunkAnySize(PoolAllocatorType* memoryPool, size_t memorysize, std::unique_ptr<uint8_t[]>&& buf = std::unique_ptr<uint8_t[]>()) :
-		MemoryChunkBase< PoolAllocatorType>(memoryPool, memorysize, std::move(buf))
+	MemoryChunkAnySize(MemoryManagerType& memoryPool, size_t memorysize) :
+		MemoryChunkBase< MemoryManagerType>(memoryPool, memorysize), elementSize(memorysize)
 	{
 
 	}
@@ -18,16 +19,21 @@ public:
 		assert(size == this->memorysize);
 		if (this->empty()) {
 			++this->useCount;
-			return this->chunk.get();// createPointer();
+			elementSize = size;
+			return this->chunk;// createPointer();
 		}
 		return nullptr;
 	};
 	DealocResult dealloc(uint8_t* ptr) override
 	{
-		if (this->chunk.get() == ptr)// getAddress(ptr))
+		if ((this->chunk <= ptr) && (this->chunk + elementSize > ptr))
 		{
 			if (this->useCount != 1)
+			{
+				assert(false);
 				return DealocResult::DEALOC_NOT_ALLOCATED;
+			}
+			elementSize = this->memorysize;
 			--this->useCount;
 			return DealocResult::WAS_FULL_IS_EMPTY;
 		}
@@ -38,8 +44,8 @@ public:
 		return this->memorysize;
 	}
 	size_t elSize(size_t index) const noexcept override {
-		assert(false);
-		return this->memorysize;
+		//assert(false);
+		return elementSize;
 	}
 };
 

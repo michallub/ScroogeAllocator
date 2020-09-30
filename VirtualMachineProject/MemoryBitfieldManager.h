@@ -106,42 +106,49 @@ public:
 			setbitfield_empty(0xFFFF'FFFF'FFFF'FFFF);
 	}
 	void setElementCount(size_t elementCount) noexcept {
-
+		
 		if constexpr (SIZE1 != 1)
 		{
-			switch (elementCount) {
-			case 4096: bitusedmask = 0xFFFF'FFFF'FFFF'FFFF; break;
-			case 2048: bitusedmask = 0x0000'0000'FFFF'FFFF; break;
-			case 1024: bitusedmask = 0x0000'0000'0000'FFFF; break;
-			case 512:  bitusedmask = 0x0000'0000'0000'00FF; break;
-			case 256:  bitusedmask = 0x0000'0000'0000'000F; break;
-			case 128:  bitusedmask = 0x0000'0000'0000'0003; break;
-			case 64:   bitusedmask = 0x0000'0000'0000'0001; break;
-			default:
-				assert(false);
-				bitusedmask = 0x0000'0000'0000'0000;
-				elementCount = 0;
-				
-				break;
-			}
+			assert((elementCount & 0x3F) == 0);
+			auto bits = elementCount >> 6;
+			bitusedmask = 0xFFFF'FFFF'FFFF'FFFF >> (64 - bits);
+			assert(bitusedmask != 0);
+			//switch (elementCount) {
+			//case 4096: bitusedmask = 0xFFFF'FFFF'FFFF'FFFF; break;
+			//case 2048: bitusedmask = 0x0000'0000'FFFF'FFFF; break;
+			//case 1024: bitusedmask = 0x0000'0000'0000'FFFF; break;
+			//case 512:  bitusedmask = 0x0000'0000'0000'00FF; break;
+			//case 256:  bitusedmask = 0x0000'0000'0000'000F; break;
+			//case 128:  bitusedmask = 0x0000'0000'0000'0003; break;
+			//case 64:   bitusedmask = 0x0000'0000'0000'0001; break;
+			//default:
+			//	assert(false);
+			//	bitusedmask = 0x0000'0000'0000'0000;
+			//	elementCount = 0;
+			//	
+			//	break;
+			//}
 			bitfield_empty() &= bitusedmask;
 		}
 		else if constexpr (SIZE1 == 1)
 		{
-			switch (elementCount) {
-			case 64: bitusedmask = 0xFFFF'FFFF'FFFF'FFFF; break;
-			case 32: bitusedmask = 0x0000'0000'FFFF'FFFF; break;
-			case 16: bitusedmask = 0x0000'0000'0000'FFFF; break;
-			case 8:  bitusedmask = 0x0000'0000'0000'00FF; break;
-			case 4:  bitusedmask = 0x0000'0000'0000'000F; break;
-			case 2:  bitusedmask = 0x0000'0000'0000'0003; break;
-			case 1:   bitusedmask = 0x0000'0000'0000'0001; break;
-			default:
-				bitusedmask = 0x0000'0000'0000'0000;
-				elementCount = 0;
-				assert(false);
-				break;
-			}
+			auto bits = elementCount;
+			bitusedmask = 0xFFFF'FFFF'FFFF'FFFF >> (64 - bits);
+			assert(bitusedmask != 0);
+			//switch (elementCount) {
+			//case 64: bitusedmask = 0xFFFF'FFFF'FFFF'FFFF; break;
+			//case 32: bitusedmask = 0x0000'0000'FFFF'FFFF; break;
+			//case 16: bitusedmask = 0x0000'0000'0000'FFFF; break;
+			//case 8:  bitusedmask = 0x0000'0000'0000'00FF; break;
+			//case 4:  bitusedmask = 0x0000'0000'0000'000F; break;
+			//case 2:  bitusedmask = 0x0000'0000'0000'0003; break;
+			//case 1:   bitusedmask = 0x0000'0000'0000'0001; break;
+			//default:
+			//	bitusedmask = 0x0000'0000'0000'0000;
+			//	elementCount = 0;
+			//	assert(false);
+			//	break;
+			//}
 		}
 		else
 			assert(false);
@@ -160,7 +167,7 @@ public:
 
 			assert((getbitfield_2(index1) & (1ull << index2)) == 0);
 
-			bitfield_empty() &= ~(1 << index1);
+			bitfield_empty() &= ~(1ull << index1);
 			bitfield_2(index1) |= (1ull << index2);
 			if (getbitfield_2(index1) == 0xFFFF'FFFF'FFFF'FFFF)
 			{
@@ -208,7 +215,7 @@ public:
 				bitfield_empty() |= (1ull << index1);
 		
 			isnowempty = ((getbitfield_empty() & bitusedmask) == bitusedmask);
-			
+			assert((getbitfield_1() & getbitfield_empty()) == 0);
 		}
 		else if constexpr (SIZE1 == 1)
 		{
