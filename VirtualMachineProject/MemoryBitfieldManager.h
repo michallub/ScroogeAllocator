@@ -248,12 +248,12 @@ public:
 	}
 	bool isAllocated(size_t index) const noexcept {
 		if constexpr (SIZE1 != 1) {
-			assert(index < size1);
+			//assert(index < SIZE1);
 			return (getbitfield_1() >> index)&0x1;
 		}
 		else
 		{
-			assert((index >> 6) < size1);
+			//assert((index >> 6) < SIZE1);
 			return (getbitfield_2(index>>6) >> (index&0x3F)) & 0x1;
 		}
 	}
