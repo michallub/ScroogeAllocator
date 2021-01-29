@@ -19,157 +19,139 @@
 #include "MemoryChunkAnySize.h"
 #include "MemoryChunkPoolAllocator.h"
 #include "MemorySizeRanges.h"
+#include "MemoryCustomAllocator.h"
+#include "MemoryBucket.h"
+
+
+constexpr size_t MEMORY_BUCKET_SIZE_BITS_DEFAULT = 16;
+constexpr size_t MEMORY_BUCKET_COUNT_BITS_DEFAULT = 7;
+constexpr size_t MEMORY_ALLOC_CONTEXT_COUNT_BITS_DEFAULT = 7;
+constexpr size_t MEMORY_FREESTORE_COUNT_DEFAULT = 1;
 
 
 
+class MemoryManagerArguments {
+	MemoryAllocatorBase& internalAllocator; 
+	MemoryAllocatorBase& poolAllocator;
+	size_t BucketAddressRangeSize = MEMORY_BUCKET_SIZE_BITS_DEFAULT;
+	size_t BucketCount = MEMORY_BUCKET_COUNT_BITS_DEFAULT;
+	size_t AllocContextCount = MEMORY_ALLOC_CONTEXT_COUNT_BITS_DEFAULT;
+	size_t FreeStroreCount = MEMORY_FREESTORE_COUNT_DEFAULT;
 
-constexpr size_t MEMORY_BUCKET_SIZE_BITS = 15;
-constexpr size_t MEMORY_BUCKET_COUNT_BITS = 7;
-constexpr size_t MEMORY_ALLOC_CONTEXT_COUNT_BITS = 7;
-constexpr size_t MEMORY_FREESTORE_COUNT = 8;
+public:
+	MemoryManagerArguments(MemoryAllocatorBase& internalAllocator, MemoryAllocatorBase& poolAllocator) :
+		internalAllocator(internalAllocator), 
+		poolAllocator(poolAllocator)
+	{
+	}
+	MemoryManagerArguments(MemoryAllocatorBase& internalAndPoolAllocator) :
+		internalAllocator(internalAndPoolAllocator), 
+		poolAllocator(internalAndPoolAllocator)
+	{
+	}
+
+	MemoryManagerArguments& setBucketAddressRangeSize(size_t bits) {
+		assert(bits < 32);
+		BucketAddressRangeSize = bits;
+		return *this;
+	}
+	MemoryManagerArguments& setBucketCount(size_t bits) {
+		assert(bits < 16);
+		BucketCount = bits;
+		return *this;
+	}
+	MemoryManagerArguments& setAllocContextCount(size_t bits) {
+		assert(bits < 16);
+		AllocContextCount = bits;
+		return *this;
+	}
+	MemoryManagerArguments& setFreeStroreCount(size_t count) {
+		assert(count < 65536);
+		FreeStroreCount = count;
+		return *this;
+	}
+
+	MemoryAllocatorBase& getInternalAllocator() {
+		return internalAllocator;
+	}
+	MemoryAllocatorBase& getPoolAllocator() {
+		return poolAllocator;
+	}
+	size_t getBucketAddressRangeSize() {
+		return BucketAddressRangeSize;
+	}
+	size_t& getBucketCount() {
+		return BucketCount;
+	}
+	size_t& getAllocContextCount() {
+		return AllocContextCount;
+	}
+	size_t& getFreeStroreCount() {
+		return FreeStroreCount;
+	}
+};
 
 
 
-constexpr size_t MEMORY_BUCKET_SIZE =
-		size_t(1) << MEMORY_BUCKET_SIZE_BITS;
-
-constexpr size_t MEMORY_BUCKET_COUNT = 
-		size_t(1) << MEMORY_BUCKET_COUNT_BITS;
-
-constexpr size_t MEMORY_ALLOC_CONTEXT_COUNT = 
-		size_t(1) << MEMORY_ALLOC_CONTEXT_COUNT_BITS;
+struct MemoryAllocationInfo: public MemoryMemInfo
+{
+	MemoryAllocationInfo(MemoryMemInfo meminfo = MemoryMemInfo()) :MemoryMemInfo(meminfo) {}
+};
 
 
 
-
-
-
-
-
-
-template<class PoolAllocatorType, class InternalStructAllocatorType, class LockType>
+template<class LockType>
 class MemoryManagerParallel
 {
-	//std::atomic_size_t counterssssssssss[10] = {};
-	using MemoryManagerType = MemoryManagerParallel<PoolAllocatorType, InternalStructAllocatorType, LockType>;
-
-	template <typename T>
-	struct ChunkDeleterT {
-		//AT& allocator;
-		
-		//ChunkDeleterT(InternalStructAllocatorType& allocator) :allocator(allocator) {}
-		ChunkDeleterT() = default;
-		ChunkDeleterT(const ChunkDeleterT& other) = default;
-		//ChunkDeleterT(ChunkDeleterT& other) = default;
-		ChunkDeleterT(ChunkDeleterT&& other) = default;
-		~ChunkDeleterT() = default;
-	
-		void operator()(T* ptr) const noexcept {
-			if (ptr)
-			{
-				auto &mm = ptr->getMemoryManager();
-				ptr->~T();
-				mm.deallocInternalStructMemory(reinterpret_cast<uint8_t*>(ptr));
-			}
-			
-		}
-	};
-
-	template <typename T, typename AT>
-	struct CustomAllocator
-	{
-		typedef T value_type;
-		
-		constexpr CustomAllocator() = default;
-		
-		template <typename U> 
-		CustomAllocator(const CustomAllocator <U, AT>& other) noexcept : 
-			allocator(other.allocator) {}
-		[[nodiscard]] T* allocate(std::size_t n) {
-			if (n > (std::numeric_limits<std::size_t>::max)() / sizeof(T))
-				throw std::bad_alloc();
-
-			if (auto p = reinterpret_cast<T*>(allocator.alloc(n * sizeof(T)))) {
-				return p;
-			}
-			throw std::bad_alloc();
-		}
-
-		void deallocate(T* p, std::size_t n) noexcept {
-			allocator.dealloc(p);
-		}
-		AT& allocator;
-	};
+	using MemoryManagerType = MemoryManagerParallel<LockType>;
+	using MemoryAllocatorsType = MemoryCustomAllocator;
 
 	using MemoryAddressRange = MemoryRange; 
 	using MemorySizeRange = MemoryRange;
-	//using MemoryBaseChunkType = MemoryChunkBase<PoolAllocatorType>;
-	using MemoryBaseChunkType = MemoryChunkBase<MemoryManagerType>;
-	using DeleterInternalType = ChunkDeleterT<MemoryBaseChunkType>;
-	///using DeleterPoolType = ChunkDeleterT<MemoryBaseChunkType >;
+	using MemoryBaseChunkType = MemoryChunkBase;
+	using DeleterBaseChunkType = ChunkDeleterT<MemoryBaseChunkType>;
 
-	using MemoryUniquePointerType = std::unique_ptr<MemoryBaseChunkType, DeleterInternalType>;
-	using MemoryMapType = std::map< MemoryAddressRange, MemoryUniquePointerType >;
-	using MemoryBucketType = std::pair< LockType, MemoryMapType >;
-	using MemoryBucketArrayType = std::array<MemoryBucketType, MEMORY_BUCKET_COUNT>;
+	using MemoryUniquePointerType = std::unique_ptr<MemoryBaseChunkType, DeleterBaseChunkType>;
+	using MemoryMapType = std::map< MemoryAddressRange, MemoryUniquePointerType, std::less<MemoryAddressRange>, MemoryAllocatorLightTyped< std::pair<const MemoryAddressRange, MemoryUniquePointerType> > >;
+	using MemoryBucketType = MemoryBucket<LockType>;
+	using DeleterMemoryBucketType = ChunkDeleterT<MemoryBucketType>;
+	using MemoryBucketUniquePtrType = std::unique_ptr<MemoryBucketType, DeleterMemoryBucketType>;
+	using MemoryBucketArrayType = std::vector<MemoryBucketUniquePtrType, MemoryAllocatorLightTyped<MemoryBucketUniquePtrType>>;
 	using ChunksRawPointerType = MemoryBaseChunkType*;
-	using ChunksListType = std::list<ChunksRawPointerType>;
-	using ChunksMapType = std::map<MemorySizeRange, ChunksListType>;
-	using ContextType = std::pair<LockType, ChunksMapType>;
-	using ContextArrayType = std::array<ContextType, MEMORY_ALLOC_CONTEXT_COUNT>;
-
-	using ContextFreeStoreArrayType = std::array<ContextType, MEMORY_FREESTORE_COUNT>;
-
-
-	std::pair<LockType, ChunksListType> listNodeStore;
-	ChunksListType getListNode() {
-		std::lock_guard<LockType> lock(listNodeStore.first);
-		ChunksListType result;
-		if (!listNodeStore.second.empty())
-		{
-			result.splice(result.begin(), listNodeStore.second, listNodeStore.second.begin());
-		}
-		else
-		{
-			result.resize(1);
-		}
-		return result;
-	}
-
-	void storeListNode(ChunksListType&& other)
-	{
-		std::lock_guard<LockType> lock(listNodeStore.first);
-		listNodeStore.second.splice(listNodeStore.second.begin(), other);
-	}
+	using ContextType = MemoryContext<LockType>;
+	using DeleterContextType = ChunkDeleterT<ContextType>;
+	using ContextUniquePtrType = std::unique_ptr<ContextType, DeleterContextType>;
+	using ContextArrayType = std::vector<ContextUniquePtrType, MemoryAllocatorLightTyped<ContextUniquePtrType>>;//
+	using ContextFreeStoreArrayType = ContextArrayType;
+	MemoryCustomAllocator allocators;
 
 	//contains all memory chunks, indexed by address range
 	MemoryBucketArrayType memory;
-	//std::array<std::pair< LockType, std::map< MemoryAddressRange, MemoryChunkBase<PoolAllocatorType>*> >, MEMORY_BUCKET_COUNT> memory;
 
 	//contains not full chunks, binded to context, indexed by chunksize
 	ContextArrayType notfullchunks;
-	//std::array<std::pair<LockType, std::map<MemorySizeRange, std::list<MemoryChunkBase<PoolAllocatorType>*>>>, MEMORY_ALLOC_CONTEXT_COUNT> notfullchunks;
 
 	//contains not full chunks, not binded to any context, indexed by chunksize
 	ContextFreeStoreArrayType freeStore;
 
-	/// std::pair<LockType, std::map<MemorySizeRange, std::list<MemoryChunkBase<PoolAllocatorType>*>>> freeStore;
 	std::atomic_size_t emptyBlocksSize = 0;
 	std::atomic_size_t emptyBlocksCount = 0;
 
 	LockType cleanMutex;
 	std::atomic_size_t cleanCounter = 0;
 
-	PoolAllocatorType memoryPool;
-	InternalStructAllocatorType internalAlloc;
-
-
-
+	size_t BucketAddressRangeSizeBits = 0;
+	size_t BucketAddressRangeSize = 0;
+	size_t BucketCountBits = 0;
+	size_t BucketCount = 0;
+	size_t AllocContextCountBits = 0;
+	size_t AllocContextCount = 0;
+	size_t FreeStroreCount = 0;
 
 	static constexpr int memorysize = sizeof(memory);
 	static constexpr int notfullchunkssize = sizeof(notfullchunks);
 
-	static size_t getAllocContext(size_t contextID = size_t(-1)) noexcept
+	size_t getAllocContext(size_t contextID = size_t(-1)) const noexcept
 	{
 		if (contextID == size_t(-1))
 		{
@@ -177,13 +159,13 @@ class MemoryManagerParallel
 			std::hash<std::thread::id> hasher;
 			contextID = hasher(thid);
 		}
-		return contextID % MEMORY_ALLOC_CONTEXT_COUNT;
+		return contextID % AllocContextCount;
 	}
-	static constexpr size_t getMemoryBucket(const uint8_t* ptr) noexcept
+	size_t getMemoryBucket(const uint8_t* ptr) const noexcept
 	{
-		return (reinterpret_cast<size_t>(ptr) >> MEMORY_BUCKET_SIZE_BITS) & (MEMORY_BUCKET_COUNT - 1);
+		return (reinterpret_cast<size_t>(ptr) >> BucketAddressRangeSizeBits) & (BucketCount - 1);
 	}
-	static size_t getNextAllocContext(size_t contextID = size_t(-1)) noexcept
+	size_t getNextAllocContext(size_t contextID = size_t(-1)) const noexcept
 	{
 		if (contextID == size_t(-1))
 		{
@@ -191,7 +173,7 @@ class MemoryManagerParallel
 			std::hash<std::thread::id> hasher;
 			contextID = hasher(thid);
 		}
-		return (contextID+1999) % MEMORY_ALLOC_CONTEXT_COUNT;
+		return (contextID+1999) % AllocContextCount;
 	}
 	MemoryUniquePointerType createNewChunk(MemorySizeRangeInfo msri, size_t size)
 	{
@@ -199,60 +181,60 @@ class MemoryManagerParallel
 		
 		if (msri.chunkType == MemoryChunkType::Precise)
 		{
-			using ChunkType = MemoryChunkPrecise<MemoryManagerType>;
-			auto* buf = internalAlloc.alloc(sizeof(ChunkType));
+			using ChunkType = MemoryChunkPrecise;
+			auto* buf = allocators.allocInternalStructMemory(sizeof(ChunkType));
 			ChunkType* rawptr = new (buf) ChunkType(
-				*this, msri.buforSize, msri.range.maxv, msri.elPerChunk);
+				allocators, msri.buforSize, msri.range.maxv, msri.elPerChunk);
 			assert((void*)buf == (void*)rawptr);
 			return MemoryUniquePointerType(static_cast<MemoryBaseChunkType*>(rawptr));
 			//uptr.reset(static_cast<MemoryBaseChunkType*>(rawptr));
 		}
 		else if (msri.chunkType == MemoryChunkType::VerySmall)
 		{
-			using ChunkType = MemoryChunkVerySmall<MemoryManagerType>;
-			auto* buf = internalAlloc.alloc(sizeof(ChunkType));
+			using ChunkType = MemoryChunkVerySmall;
+			auto* buf = allocators.allocInternalStructMemory(sizeof(ChunkType));
 			ChunkType* rawptr = new (buf) ChunkType(
-				*this, msri.buforSize, msri.range.maxv, msri.elPerChunk);
+				allocators, msri.buforSize, msri.range.maxv, msri.elPerChunk);
 			assert((void*)buf == (void*)rawptr);
 			return MemoryUniquePointerType(static_cast<MemoryBaseChunkType*>(rawptr));
 			//uptr.reset(static_cast<MemoryBaseChunkType*>(rawptr));
 		}
 		else if (msri.chunkType == MemoryChunkType::Small)
 		{
-			using ChunkType = MemoryChunkSmall<MemoryManagerType>;
-			auto* buf = internalAlloc.alloc(sizeof(ChunkType));
+			using ChunkType = MemoryChunkSmall;
+			auto* buf = allocators.allocInternalStructMemory(sizeof(ChunkType));
 			ChunkType* rawptr = new (buf) ChunkType(
-				*this, msri.buforSize, msri.range.maxv, msri.elPerChunk);
+				allocators, msri.buforSize, msri.range.maxv, msri.elPerChunk);
 			assert((void*)buf == (void*)rawptr);
 			return MemoryUniquePointerType(static_cast<MemoryBaseChunkType*>(rawptr));
 			//uptr.reset(static_cast<MemoryBaseChunkType*>(rawptr));
 		}
 		else if (msri.chunkType == MemoryChunkType::Medium)
 		{
-			using ChunkType = MemoryChunkMedium<MemoryManagerType>;
-			auto* buf = internalAlloc.alloc(sizeof(ChunkType));
+			using ChunkType = MemoryChunkMedium;
+			auto* buf = allocators.allocInternalStructMemory(sizeof(ChunkType));
 			ChunkType* rawptr = new (buf) ChunkType(
-				*this, msri.buforSize, msri.range.maxv, msri.elPerChunk);
+				allocators, msri.buforSize, msri.range.maxv, msri.elPerChunk);
 			assert((void*)buf == (void*)rawptr);
 			return MemoryUniquePointerType(static_cast<MemoryBaseChunkType*>(rawptr));
 			//uptr.reset(static_cast<MemoryBaseChunkType*>(rawptr));
 		}
 		else if (msri.chunkType == MemoryChunkType::Large)
 		{
-			using ChunkType = MemoryChunkLarge<MemoryManagerType>;
-			auto* buf = internalAlloc.alloc(sizeof(ChunkType));
+			using ChunkType = MemoryChunkLarge;
+			auto* buf = allocators.allocInternalStructMemory(sizeof(ChunkType));
 			ChunkType* rawptr = new (buf) ChunkType(
-				*this, msri.buforSize, msri.range.maxv, msri.elPerChunk);
+				allocators, msri.buforSize, msri.range.maxv, msri.elPerChunk);
 			assert((void*)buf == (void*)rawptr);
 			return MemoryUniquePointerType(static_cast<MemoryBaseChunkType*>(rawptr));
 			//uptr.reset(static_cast<MemoryBaseChunkType*>(rawptr));
 		}
 		else if (msri.chunkType == MemoryChunkType::AnySize)
 		{
-			using ChunkType = MemoryChunkAnySize<MemoryManagerType>;
-			auto* buf = internalAlloc.alloc(sizeof(ChunkType));
+			using ChunkType = MemoryChunkAnySize;
+			auto* buf = allocators.allocInternalStructMemory(sizeof(ChunkType));
 			ChunkType* rawptr = new (buf) ChunkType(
-				*this, size);
+				allocators, size);
 			assert((void*)buf == (void*)rawptr);
 			return MemoryUniquePointerType(static_cast<MemoryBaseChunkType*>(rawptr));
 			//uptr.reset(static_cast<MemoryBaseChunkType*>(rawptr));
@@ -265,7 +247,7 @@ class MemoryManagerParallel
 		//return uptr;
 	}
 
-	static size_t getFreeStoreContext(size_t contextID = size_t(-1)) noexcept
+	size_t getFreeStoreContext(size_t contextID = size_t(-1)) const noexcept
 	{
 		if (contextID == size_t(-1))
 		{
@@ -273,27 +255,88 @@ class MemoryManagerParallel
 			std::hash<std::thread::id> hasher;
 			contextID = hasher(thid);
 		}
-		return (contextID + 1999) % MEMORY_FREESTORE_COUNT;
+		return (contextID + 1999) % FreeStroreCount;
+	}
+
+	bool initBuckets(size_t bucketAddressRangeSizeBits, size_t bucketCountBits) {
+		if (BucketAddressRangeSizeBits != 0) return false;
+		if (BucketCountBits != 0) return false;
+		if (bucketAddressRangeSizeBits == 0) return false;
+		if (bucketCountBits == 0) return false;
+		if (bucketAddressRangeSizeBits > 32) return false;
+		if (bucketCountBits > 16) return false;
+
+		BucketAddressRangeSizeBits = bucketAddressRangeSizeBits;
+		BucketCountBits = bucketCountBits;
+		BucketAddressRangeSize = size_t(1) << bucketAddressRangeSizeBits;
+		BucketCount = size_t(1) << BucketCountBits;
+
+		memory.reserve(BucketCount);
+		for (size_t i = 0; i < BucketCount; i++)
+		{
+			auto* tmpvoid = allocators.allocInternalStructMemory(sizeof(MemoryBucketType));
+			auto* tmptyped = new (tmpvoid) MemoryBucketType(allocators);
+			std::unique_ptr<MemoryBucketType, DeleterMemoryBucketType> uptr(tmptyped);
+			memory.push_back(std::move(uptr));
+		}
+
+		return true;
+	}
+
+	bool initContexts(size_t allocContextCountBits)
+	{
+		if (AllocContextCountBits != 0) return false;
+		if (allocContextCountBits == 0) return false;
+		if (allocContextCountBits > 16) return false;
+		
+		AllocContextCountBits = allocContextCountBits;
+		AllocContextCount = size_t(1) << AllocContextCountBits;
+
+		notfullchunks.reserve(AllocContextCount);
+		for (size_t i = 0; i < AllocContextCount; i++)
+		{
+			auto* tmpvoid = allocators.allocInternalStructMemory(sizeof(ContextType));
+			auto* tmptyped = new (tmpvoid) ContextType(allocators);
+			std::unique_ptr<ContextType, DeleterContextType> uptr(tmptyped);
+			notfullchunks.push_back(std::move(uptr));
+		}
+
+		return true;
+	}
+
+	bool initFreeStore(size_t freeStroreCount)
+	{
+		if (FreeStroreCount != 0) return false;
+		if (freeStroreCount == 0) return false;
+		if (freeStroreCount > 65536) return false;
+
+		FreeStroreCount = freeStroreCount;
+
+		freeStore.reserve(FreeStroreCount);
+		for (size_t i = 0; i < FreeStroreCount; i++)
+		{
+			auto* tmpvoid = allocators.allocInternalStructMemory(sizeof(ContextType));
+			auto* tmptyped = new (tmpvoid) ContextType(allocators);
+			std::unique_ptr<ContextType, DeleterContextType> uptr(tmptyped);
+			freeStore.push_back(std::move(uptr));
+		}
+
+		return true;
 	}
 
 public:
-	uint8_t* allocPoolMemory(size_t size) {
-		return reinterpret_cast<uint8_t*>(memoryPool.alloc(size));
-	}
-	void deallocPoolMemory(uint8_t* ptr) {
-		memoryPool.dealloc(ptr);
-	}
-	uint8_t* allocInternalStructMemory(size_t size) {
-		return reinterpret_cast<uint8_t*>(internalAlloc.alloc(size));
-	}
-	void deallocInternalStructMemory(uint8_t* ptr) {
-		internalAlloc.dealloc(ptr);
-	}
+	
 
-
-	MemoryManagerParallel() = default;
-	MemoryManagerParallel(const PoolAllocatorType &pool): memoryPool(pool) { }
-	MemoryManagerParallel(PoolAllocatorType&& pool) : memoryPool(std::move(pool)) { }
+	MemoryManagerParallel(MemoryManagerArguments args) :
+		allocators(args.getPoolAllocator(), args.getInternalAllocator()),
+		memory(allocators.getInternalAllocatorLightTyped<MemoryBucketUniquePtrType>()),
+		notfullchunks(allocators.getInternalAllocatorLightTyped<ContextUniquePtrType>()),
+		freeStore(allocators.getInternalAllocatorLightTyped<ContextUniquePtrType>())
+	{
+		initBuckets(args.getBucketAddressRangeSize(), args.getBucketCount());
+		initContexts(args.getAllocContextCount());
+		initFreeStore(args.getFreeStroreCount());
+	}
 
 	MemoryManagerParallel(const MemoryManagerParallel&) = delete;
 	MemoryManagerParallel(MemoryManagerParallel&&) = delete;
@@ -320,14 +363,14 @@ public:
 			auto fsContext = getFreeStoreContext(contextID);
 			auto& fs = freeStore[fsContext];
 
-			auto& fsmutex = fs.first;
+			auto& fsmutex = fs->getLock();
 
 			if(cleanContexts)
 			for (auto& context : notfullchunks)
 			{
-				auto& cmutex = context.first;
+				auto& cmutex = context->getLock();
 				const std::lock_guard<LockType> lockContext(cmutex);//lock context
-				for (auto& sizeRange : context.second)
+				for (auto& sizeRange : context->getContext())
 				{
 
 					if (sizeRange.second.begin() != sizeRange.second.end())
@@ -337,12 +380,13 @@ public:
 						{
 							if ((*chunkit)->empty() || force)
 							{
-								//emptyBlocksSize -= (*chunkit)->getMemorySize();
-								//emptyBlocksCount -= 1;
 								auto ptr = (*chunkit);
 								MemoryAddressRange mrange = { ptr->getAddresAsInt(), ptr->getAddresAsInt()+ ptr->getMemorySize()-1 };
-								fs.second[sizeRange.first].push_back(ptr);
-								chunkit = sizeRange.second.erase(chunkit);
+
+								auto oldChunkIt = chunkit++;
+								auto& dstlist = fs->getChunkList(sizeRange.first);
+								auto& srclist = sizeRange.second;
+								dstlist.splice(dstlist.begin(), srclist, oldChunkIt);
 							}
 							else
 								chunkit++;
@@ -354,26 +398,20 @@ public:
 			if (cleanFreeStore)
 			{
 				constexpr size_t toDeleteListSize = 128;
-				std::list<MemoryChunkBase<MemoryManagerType>* > toDeleteList;
+				std::list<MemoryBaseChunkType* , MemoryAllocatorLightTyped<MemoryBaseChunkType*>> toDeleteList(allocators.getInternalAllocatorLightTyped<MemoryBaseChunkType*>());
 				{
 					const std::lock_guard<LockType> lockBucket(fsmutex);//lock free store
-					for (auto& e : fs.second)
+					for (auto& e : fs->getContext())
 					{
 						for (auto ee = e.second.begin(); ee != e.second.end(); )
 						{
 							if ((*ee)->empty())
 							{
-								//counterssssssssss[0]++;
-								
-								//auto oldvalue1 = 
 								emptyBlocksSize -= (*ee)->getMemorySize();
-								//auto oldvalue2 = 
 								emptyBlocksCount -= 1;
-								//if (oldvalue1 == 0 || oldvalue2 == 0)
-								//	std::cout << oldvalue2<<"\n";
 								auto tmpee = ee;
 								++tmpee;
-								toDeleteList.splice(toDeleteList.begin(), e.second, ee);// = { e.first, *ee };
+								toDeleteList.splice(toDeleteList.begin(), e.second, ee);
 								ee = tmpee;
 							}
 							else
@@ -387,28 +425,25 @@ public:
 					MemoryRange mrange = { (*e).getAddresAsInt(), (*e).getAddresAsInt() };
 					auto bucketID = getMemoryBucket(reinterpret_cast<uint8_t*>(mrange.minv));
 					auto& bucket = memory[bucketID];
-					auto& bmutex = bucket.first;
+					auto& bmutex = bucket->lock;
 					{
 						const std::lock_guard<LockType> lockBucket(bmutex);//lock bucket
-						auto it = bucket.second.find(mrange);
-						if (it == bucket.second.end())
+						auto it = bucket->chunks.find(mrange);
+						if (it == bucket->chunks.end())
 							assert(false);
 						else
 						{
-							//auto ptrtodelete = std::move(it->second);
-							//ptrtodelete->~MemoryBaseChunkType();
-							//deallocInternalStructMemory internalAlloc.dealloc(reinterpret_cast<uint8_t*>( ptrtodelete.get()));
-							bucket.second.erase(it);
+							bucket->chunks.erase(it);
 						}
 					}//unlock bucket
 				}
 			}
 		}
 
-		if (force)
-		{
-			memoryPool.clean(0, 0);
-		}
+		//if (force)
+		//{
+		//	memoryPool.clean(0, 0);
+		//}
 	
 	}//unlock clean
 
@@ -429,29 +464,11 @@ public:
 		auto fsContext = getFreeStoreContext(contextID);
 		auto& fs = freeStore[fsContext];
 
-		//size_t counter = 3;
-		//while (counter) {
-		//	auto& cmutexptr = notfullchunks[contexttmp].first;
-		//
-		//	if (cmutexptr.try_lock())
-		//	{
-		//		context = contexttmp;
-		//		break;
-		//	}
-		//	contexttmp = getNextAllocContext(contexttmp);
-		//	--counter;
-		//}
-		//
-		//if (counter == 0)
-		//{
-		//	auto* cmutexptr = &notfullchunks[context].first;
-		//	cmutexptr->lock();
-		//}
-		auto* cmutexptr = &notfullchunks[context].first;
+		auto* cmutexptr = &notfullchunks[context]->getLock();
 		cmutexptr->lock();
 		{
-			auto& cmutex = notfullchunks[context].first;
-			auto& notfull = notfullchunks[context].second;
+			auto& cmutex = notfullchunks[context]->getLock();
+			auto& notfull = notfullchunks[context]->getContext();
 
 			const std::lock_guard<LockType> lockContext(cmutex, std::adopt_lock_t());//lock context
 
@@ -461,7 +478,7 @@ public:
 				auto* chunk = notusedIt->second.front();
 
 				auto bucketID = getMemoryBucket(reinterpret_cast<uint8_t*>(chunk->getAddresAsInt()));
-				auto& bmutex = memory[bucketID].first;
+				auto& bmutex = memory[bucketID]->lock;
 
 				{
 					const std::lock_guard<LockType> lockBucket(bmutex);//lock bucket
@@ -475,30 +492,31 @@ public:
 					}
 					if (wasEmpty)
 					{
-						//counterssssssssss[1]++;
-						//auto oldvalue1 = 
 						emptyBlocksSize -= chunk->getMemorySize();
-						//auto oldvalue2 = 
 						emptyBlocksCount -= 1;
-						//if (oldvalue1 == 0 || oldvalue2 == 0)
-						//	std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!2\n";
 					}
 					if (chunk->full())
-						notusedIt->second.pop_front();
+					{
+						auto& srclist = notusedIt->second;
+						auto& dstlist = chunk->freelistNode;
+						dstlist.splice(dstlist.begin(), srclist, srclist.begin());
+					}
 					return ptr;
 				}//unlock bucket
 			}
 			else
 			{
-				//std::unique_ptr<MemoryChunkBase<PoolAllocatorType>> uptr;
 				MemoryUniquePointerType uptr = nullptr;
 				ChunksRawPointerType rptr = nullptr;
+				
+				typename MemoryContext<LockType>::ValueType templist(allocators.getInternalAllocatorLightTyped<MemoryChunkBase*>());
 
-				auto& fsmutex = fs.first; fsmutex.lock();;
-				//if ()//if (fsmutex.try_lock())
+
+				auto& fsmutex = fs->getLock(); 
+				fsmutex.lock();;
 				{
 					const std::lock_guard<LockType> lockFreeStore(fsmutex, std::adopt_lock);//lock free store
-					auto& fstore = fs.second;
+					auto& fstore = fs->getContext();
 					auto fsit = fstore.find(bucketminmax);
 					if (fsit != fstore.end() && !fsit->second.empty())
 					{
@@ -510,27 +528,22 @@ public:
 						//and smallest address (it possibly lower fragmentation) 
 
 						size_t matchingCounter = 0;
-						//static size_t maxMatchingCounter = 0;
 						for (auto it = fslist.begin(); it != fslist.end(); ++it)
 						{
 							auto chsize = (*it)->getMemorySize();
-							if ( (*it < bestptr) && (chunkType == MemoryChunkType::AnySize ?
+							if ((chunkType == MemoryChunkType::AnySize ?
 								((chsize >= size) && (chsize * 0.95 <= size)) :
 								true))
 							{
 								bestptr = *it;
 								bestit = it;
-								//++matchingCounter;
-								//if (maxMatchingCounter < matchingCounter)
-								//	maxMatchingCounter = matchingCounter;
-								//if (matchingCounter == 3)
-								//	break;
+								break;
 							}
 						}
 						if (bestit != fslist.end())
 						{
 							rptr = *bestit;
-							fslist.erase(bestit);
+							templist.splice(templist.begin(), fslist, bestit);
 						}
 					}
 				}//unlock free store
@@ -553,7 +566,7 @@ public:
 							rptr->getAddresAsInt() + rptr->getMemorySize() - 1 };
 
 					auto bucketID = getMemoryBucket(reinterpret_cast<uint8_t*>(memrange.minv));
-					auto& bmutex = memory[bucketID].first;
+					auto& bmutex = memory[bucketID]->lock;
 
 					uint8_t* ptr = nullptr;
 					ChunksRawPointerType chunkaddress = nullptr;
@@ -588,25 +601,36 @@ public:
 						if (uptr)
 						{
 							if (!uptr->full())
-								notfull[bucketminmax].push_front(chunkaddress);
-
-							assert(memory[bucketID].second.count(memrange) == 0);
-							memory[bucketID].second[memrange].reset(uptr.release());
+							{
+								auto& dstlist = notfullchunks[context]->getChunkList(bucketminmax);
+								auto& srclist = chunkaddress->freelistNode;
+								dstlist.splice(dstlist.begin(), srclist, srclist.begin());
+							}
+							else
+							{
+								//SPLICE
+							}
+							assert(memory[bucketID]->chunks.count(memrange) == 0);
+							memory[bucketID]->chunks[memrange].reset(uptr.release());
 						}
 						else
 						{
 							if (!rptr->full())
-								notfull[bucketminmax].push_front(chunkaddress);
-
+							{
+								auto& dstlist = notfullchunks[context]->getChunkList(bucketminmax);
+								auto& srclist = templist;
+								dstlist.splice(dstlist.begin(), srclist, srclist.begin());
+							}
+							else
+							{
+								auto& dstlist = rptr->freelistNode;
+								auto& srclist = templist;
+								dstlist.splice(dstlist.begin(), srclist, srclist.begin());
+							}
 							if (wasEmpty)
 							{
-								//counterssssssssss[2]++;
-								//auto oldvalue1 = 
 								emptyBlocksSize -= rptr->getMemorySize();
-								//auto oldvalue2 = 
 								emptyBlocksCount -= 1;
-								//if (oldvalue1 == 0 || oldvalue2 == 0)
-								//	std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!3\n";
 							}
 						}
 					}//unlock bucket
@@ -637,10 +661,10 @@ public:
 		auto& fs = freeStore[fsContext];
 
 		size_t iteration = 0;
-		while (iteration < MEMORY_BUCKET_COUNT)
+		while (iteration < BucketCount)
 		{
-			auto& bmutex = memory[bucketID].first;
-			auto& bucket = memory[bucketID].second;
+			auto& bmutex = memory[bucketID]->lock;
+			auto& bucket = memory[bucketID]->chunks;
 			{
 				const std::lock_guard<LockType> lockBucket(bmutex);//lock bucket
 
@@ -651,38 +675,11 @@ public:
 				if (chunkIt == bucket.end())
 				{
 					iteration++;
-					bucketID = ((bucketID == 0) ? MEMORY_BUCKET_COUNT : bucketID) - 1;
+					bucketID = ((bucketID == 0) ? BucketCount : bucketID) - 1;
 					continue;
 				}
 
-				
-				//auto oldUseCount = chunkIt->second->getUseCount();//////DEBUG
-
 				auto dealocFromChunkResult = chunkIt->second->dealloc(ptr);
-				
-				//auto newUseCount = chunkIt->second->getUseCount();//////DEBUG
-				
-				//if (dealocFromChunkResult == DealocResult::OK)//////DEBUG
-				//{
-				//	if(!(oldUseCount != 0 && newUseCount != 0))
-				//		std::cout << "ERROR 1\n";//////DEBUG
-				//}
-				//if (dealocFromChunkResult == DealocResult::NOW_IS_EMPTY_CHUNK)//////DEBUG
-				//{
-				//	if (!(oldUseCount != 0 && newUseCount == 0))
-				//		std::cout << "ERROR 2\n";//////DEBUG
-				//}
-				//if (dealocFromChunkResult == DealocResult::WAS_FULL_CHUNK)//////DEBUG
-				//{
-				//	if (!(oldUseCount != 0 && newUseCount != 0))
-				//		std::cout << "ERROR 3\n";//////DEBUG
-				//}
-				//if (dealocFromChunkResult == DealocResult::WAS_FULL_IS_EMPTY)//////DEBUG
-				//{
-				//	if (!(oldUseCount != 0 && newUseCount == 0))
-				//		std::cout << "ERROR 4\n";//////DEBUG
-				//}
-
 
 				if (dealocFromChunkResult == DealocResult::OK)
 				{
@@ -691,7 +688,6 @@ public:
 				}
 				else if (dealocFromChunkResult == DealocResult::NOW_IS_EMPTY_CHUNK)
 				{
-					//counterssssssssss[3]++;
 					emptyBlocksSize += chunkIt->second->getMemorySize();
 					emptyBlocksCount += 1;
 					needClean = true;
@@ -701,23 +697,19 @@ public:
 					auto elemsize = chunkIt->second->elSize();
 					auto bucketRR = getSizeRange(elemsize);
 
-					//?
 					chunkIt2 = chunkIt;
 					bucketRR2 = bucketRR;
 					isChunktToFreestore = true;
-					//return;
 				}
 				else if (dealocFromChunkResult == DealocResult::WAS_FULL_IS_EMPTY)
 				{
 					auto elemsize = chunkIt->second->elSize();
 					auto bucketRR = getSizeRange(elemsize);
 
-					//?
 					chunkIt2 = chunkIt;
 					bucketRR2 = bucketRR;
 					needClean = true;
 					isChunktToFreestore = true;
-					//counterssssssssss[4]++;
 					emptyBlocksSize += chunkIt->second->getMemorySize();
 					emptyBlocksCount += 1;
 				}
@@ -729,14 +721,19 @@ public:
 			}//unlock bucket
 
 			if (isChunktToFreestore) {
-				auto& fsmutex = fs.first;
+				auto& fsmutex = fs->getLock();
 				{
 					const std::lock_guard<LockType> lockFreeStore(fsmutex);//lock free store
-					fs.second[bucketRR2.range].push_back(chunkIt2->second.get());
+
+					auto& dstlist = fs->getChunkList(bucketRR2.range);
+					auto& srclist = chunkIt2->second.get()->freelistNode;
+					dstlist.splice(dstlist.begin(), srclist, srclist.begin());
 				}//unlock free store
 			}
-			if(needClean)
-				clean();
+			if (needClean)
+			{
+				clean(); 
+			}
 			return;
 		} 
 		
@@ -744,4 +741,136 @@ public:
 		return;
 	}
 
+	MemoryAllocationInfo getInfo(uint8_t* ptr, size_t contextID = size_t(-1))
+	{
+		if (ptr == nullptr)
+			return MemoryAllocationInfo();
+
+		auto chunkIt2 = MemoryMapType::iterator();
+		MemorySizeRangeInfo bucketRR2;
+		bool needClean = false;
+		bool isChunktToFreestore = false;
+
+		//auto context = getAllocContext(contextID);
+		auto bucketID = getMemoryBucket(ptr);
+
+		//auto fsContext = getFreeStoreContext(contextID);
+		//auto& fs = freeStore[fsContext];
+
+		size_t iteration = 0;
+		while (iteration < BucketCount)
+		{
+			auto& bmutex = memory[bucketID]->lock;
+			auto& bucket = memory[bucketID]->chunks;
+			{
+				const std::lock_guard<LockType> lockBucket(bmutex);//lock bucket
+
+				auto chunkIt = bucket.find(
+					MemoryRange{
+						reinterpret_cast<size_t>(ptr),
+						reinterpret_cast<size_t>(ptr) });
+				if (chunkIt == bucket.end())
+				{
+					iteration++;
+					bucketID = ((bucketID == 0) ? BucketCount : bucketID) - 1;
+					continue;
+				}
+
+				auto result = chunkIt->second->getInfo(ptr);
+
+				return MemoryAllocationInfo(result);
+			}//unlock bucket
+
+			return MemoryAllocationInfo();
+		}
+		return MemoryAllocationInfo();;
+	}
+
 };
+
+template <typename T1, typename LockType>
+class MemoryManagerAllocator
+{
+
+	template <typename T1, typename T2, typename LockType>
+	friend bool operator==(const MemoryManagerAllocator<T1, LockType>& A, const MemoryManagerAllocator<T2, LockType>& B) noexcept;
+	template <typename T1, typename T2, typename LockType>
+	friend bool operator!=(const MemoryManagerAllocator<T1, LockType>& A, const MemoryManagerAllocator<T2, LockType>& B) noexcept;
+
+	template <typename T2, typename LockType>
+	friend class MemoryManagerAllocator;
+
+	MemoryManagerParallel<LockType>& manager;
+
+public:
+
+	typedef T1 value_type;
+
+	MemoryManagerAllocator(MemoryManagerParallel<LockType>& manager) noexcept :manager(manager) {}
+
+	template <typename T2>
+	MemoryManagerAllocator(MemoryManagerAllocator<T2, LockType>& other) noexcept :
+		manager(other.manager) {
+	}
+
+	template <typename T2>
+	MemoryManagerAllocator(MemoryManagerAllocator<T2, LockType>&& other) noexcept :
+		manager(other.manager) {
+	}
+
+	template <typename T2>
+	MemoryManagerAllocator(const MemoryManagerAllocator<T2, LockType>& other) noexcept :
+		manager(other.manager) {
+	}
+
+	template <typename T2>
+	MemoryManagerAllocator(const MemoryManagerAllocator<T2, LockType>&& other) noexcept :
+		manager(other.manager) {
+	}
+
+	T1* allocate(size_t n)
+	{
+		if (n > (std::numeric_limits<std::size_t>::max)() / sizeof(T1))
+			throw std::bad_alloc();
+
+		if (auto p = static_cast<T1*>((void*)manager.alloc(n * sizeof(T1))))
+			return p;
+
+		throw std::bad_alloc();
+	}
+
+	void deallocate(T1* ptr, size_t n) noexcept
+	{
+		manager.dealloc((uint8_t*)ptr);
+	}
+};
+
+template <typename T1, typename T2, typename LockType>
+inline bool operator==(const MemoryManagerAllocator<T1, LockType>& A, const MemoryManagerAllocator<T2, LockType>& B) noexcept {
+	return &A.manager == &B.manager;
+}
+
+template <typename T1, typename T2, typename LockType>
+inline bool operator!=(const MemoryManagerAllocator<T1, LockType>& A, const MemoryManagerAllocator<T2, LockType>& B) noexcept {
+	return &A.manager != &B.manager;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

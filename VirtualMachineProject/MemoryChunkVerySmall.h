@@ -3,9 +3,9 @@
 #include "MemoryBitfieldManager.h"
 #include "WastedBytesCounter.h"
 
-template <class MemoryManagerType, size_t BITFIELDSSIZE, size_t ELEMENTSCOUNT, size_t WASTEDBYTESBITSCOUNT>
+template <size_t BITFIELDSSIZE, size_t ELEMENTSCOUNT, size_t WASTEDBYTESBITSCOUNT>
 class MemoryChunkTemplate :
-    public MemoryChunkBase<MemoryManagerType>
+    public MemoryChunkBase
 {
 	MemoryBitfieldManager<BITFIELDSSIZE> bitfields;
 	WastedBytesCounter<ELEMENTSCOUNT, WASTEDBYTESBITSCOUNT> wastedbytes;
@@ -14,8 +14,8 @@ class MemoryChunkTemplate :
 	
 
 public:
-	MemoryChunkTemplate(MemoryManagerType& memorymanager, size_t memorysize, size_t elementSize, size_t elementCount) :
-				MemoryChunkBase<MemoryManagerType>(memorymanager, memorysize), elementSize(elementSize)
+	MemoryChunkTemplate(MemoryCustomAllocator& memoryallocs, size_t memorysize, size_t elementSize, size_t elementCount) :
+				MemoryChunkBase(memoryallocs, memorysize), elementSize(elementSize)
 	{
 		bitfields.setElementCount(elementCount);
 
@@ -49,19 +49,30 @@ public:
 		this->useCount--;
 		return result;
 	}
+	MemoryMemInfo getInfo(uint8_t* ptr) const noexcept override {
+		auto addr = (uint8_t*)ptr - this->chunk;
+		if (addr < 0 || addr >= this->memorysize)
+			return MemoryMemInfo();
+		size_t index = addr / elementSize;
+		MemoryMemInfo info;
+		info.buferAddress = chunk + index * elementSize;
+		info.chunkAddress = chunk;
+		info.chunkSize = memorysize;
+		info.allocatedSize = elementSize;
+		if (bitfields.isAllocated(index))
+		{
+			info.isAllocated = true;
+			info.requestedSize = elementSize - wastedbytes.getWastedBytes(index);
+		}
+		return info;
+	}
 };
 
-template <class MemoryManagerType>
-using MemoryChunkVerySmall = MemoryChunkTemplate<MemoryManagerType, 32, 2048, 2>;
 
-template <class MemoryManagerType>
-using MemoryChunkSmall = MemoryChunkTemplate<MemoryManagerType, 16, 1024, 4>;
-
-template <class MemoryManagerType>
-using MemoryChunkMedium = MemoryChunkTemplate<MemoryManagerType, 1, 64, 8>;
-
-template <class MemoryManagerType>
-using MemoryChunkLarge = MemoryChunkTemplate<MemoryManagerType, 1, 16, 16>;
+using MemoryChunkVerySmall = MemoryChunkTemplate<32, 2048, 2>;
+using MemoryChunkSmall = MemoryChunkTemplate<16, 1024, 4>;
+using MemoryChunkMedium = MemoryChunkTemplate<1, 64, 8>;
+using MemoryChunkLarge = MemoryChunkTemplate<1, 16, 16>;
 
 //const int asdMemoryChunkLarge = sizeof(MemoryChunkLarge<MemoryPoolAllocatorInterface>);
 //const int asdMemoryChunkMedium = sizeof(MemoryChunkMedium<MemoryPoolAllocatorInterface>);

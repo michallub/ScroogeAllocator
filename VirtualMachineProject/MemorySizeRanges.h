@@ -171,34 +171,34 @@ static constexpr MemorySizeRangeInfo elementSize_perChunk_Table[] = {
 	{{ 73, 80 }, 768, MemoryChunkType::Small, 65536},
 	{{ 81, 88 }, 704, MemoryChunkType::Small, 65536},
 	{{ 89, 96 }, 640, MemoryChunkType::Small, 65536},
-	{{ 97, 104 }, 576, MemoryChunkType::Small, 65536},
-	{{ 105, 112 }, 576, MemoryChunkType::Small, 65536},
+	{{ 97, 104 }, 576, MemoryChunkType::Small, 65536},		 //mergeA
+	{{ 105, 112 }, 576, MemoryChunkType::Small, 65536},		 // mergeB
 	{{ 113, 120 }, 512, MemoryChunkType::Small, 65536},
 	{{ 121, 128 }, 1024, MemoryChunkType::Small, 131072},
 	{{ 129, 144 }, 896, MemoryChunkType::Small, 131072},
 	{{ 145, 160 }, 768, MemoryChunkType::Small, 131072},
 	{{ 161, 176 }, 704, MemoryChunkType::Small, 131072},
 	{{ 177, 192 }, 640, MemoryChunkType::Small, 131072},
-	{{ 193, 208 }, 576, MemoryChunkType::Small, 131072},
-	{{ 209, 224 }, 576, MemoryChunkType::Small, 131072},
-	{{ 225, 240 }, 512, MemoryChunkType::Small, 131072},
-	{{ 241, 256 }, 512, MemoryChunkType::Small, 131072},
-	{{ 257, 272 }, 448, MemoryChunkType::Small, 131072},
-	{{ 273, 288 }, 448, MemoryChunkType::Small, 131072},
+	{{ 193, 208 }, 576, MemoryChunkType::Small, 131072},	 //mergeA
+	{{ 209, 224 }, 576, MemoryChunkType::Small, 131072},	 // mergeB
+	{{ 225, 240 }, 512, MemoryChunkType::Small, 131072},	 //mergeA
+	{{ 241, 256 }, 512, MemoryChunkType::Small, 131072},	 // mergeB
+	{{ 257, 272 }, 448, MemoryChunkType::Small, 131072},	 //mergeA
+	{{ 273, 288 }, 448, MemoryChunkType::Small, 131072},	 // mergeB
 	{{ 289, 304 }, 832, MemoryChunkType::Small, 262144},
-	{{ 305, 320 }, 384, MemoryChunkType::Small, 131072},
-	{{ 321, 336 }, 384, MemoryChunkType::Small, 131072},
-	{{ 337, 352 }, 704, MemoryChunkType::Small, 262144},
-	{{ 353, 368 }, 704, MemoryChunkType::Small, 262144},
-	{{ 369, 384 }, 320, MemoryChunkType::Small, 131072},
-	{{ 385, 400 }, 320, MemoryChunkType::Small, 131072},
-	{{ 401, 416 }, 576, MemoryChunkType::Small, 262144},
-	{{ 417, 432 }, 576, MemoryChunkType::Small, 262144},
-	{{ 433, 448 }, 576, MemoryChunkType::Small, 262144},
-	{{ 449, 464 }, 256, MemoryChunkType::Small, 131072},
-	{{ 465, 480 }, 256, MemoryChunkType::Small, 131072},
-	{{ 481, 496 }, 256, MemoryChunkType::Small, 131072},
-	{{ 497, 512 }, 256, MemoryChunkType::Small, 131072},
+	{{ 305, 320 }, 384, MemoryChunkType::Small, 131072},	 //mergeA
+	{{ 321, 336 }, 384, MemoryChunkType::Small, 131072},	 // mergeB
+	{{ 337, 352 }, 704, MemoryChunkType::Small, 262144},	 //mergeA
+	{{ 353, 368 }, 704, MemoryChunkType::Small, 262144},	 // mergeB
+	{{ 369, 384 }, 320, MemoryChunkType::Small, 131072},	 //mergeA
+	{{ 385, 400 }, 320, MemoryChunkType::Small, 131072},	 // mergeB
+	{{ 401, 416 }, 576, MemoryChunkType::Small, 262144},	 //mergeA
+	{{ 417, 432 }, 576, MemoryChunkType::Small, 262144},	 // mergeB
+	{{ 433, 448 }, 576, MemoryChunkType::Small, 262144},	 // mergeC
+	{{ 449, 464 }, 256, MemoryChunkType::Small, 131072},	 //mergeA
+	{{ 465, 480 }, 256, MemoryChunkType::Small, 131072},	 // mergeB
+	{{ 481, 496 }, 256, MemoryChunkType::Small, 131072},	 // mergeC
+	{{ 497, 512 }, 256, MemoryChunkType::Small, 131072},	 // mergeD
 	{{ 513, 576 }, 56, MemoryChunkType::Medium, 32768},
 	{{ 577, 640 }, 51, MemoryChunkType::Medium, 32768},
 	{{ 641, 704 }, 46, MemoryChunkType::Medium, 32768},
@@ -227,18 +227,18 @@ static constexpr MemorySizeRangeInfo elementSize_perChunk_Table[] = {
 	{{ 4609, 5120 }, 12, MemoryChunkType::Large, 65536},
 	{{ 5121, 5632 }, 11, MemoryChunkType::Large, 65536},
 	{{ 5633, 6144 }, 10, MemoryChunkType::Large, 65536},
-	{{ 6145, 6656 }, 9, MemoryChunkType::Large, 65536},
-	{{ 6657, 7168 }, 9, MemoryChunkType::Large, 65536},
-	{{ 7169, 7680 }, 8, MemoryChunkType::Large, 65536},
-	{{ 7681, 8192 }, 16, MemoryChunkType::Large, 131072},
+	{{ 6145, 6656 }, 9, MemoryChunkType::Large, 65536},			 //mergeA
+	{{ 6657, 7168 }, 9, MemoryChunkType::Large, 65536},			 // mergeB
+	{{ 7169, 7680 }, 8, MemoryChunkType::Large, 65536},			 //mergeA
+	{{ 7681, 8192 }, 16, MemoryChunkType::Large, 131072},		 // mergeB
 	{{ 8193, 9216 }, 14, MemoryChunkType::Large, 131072},
 	{{ 9217, 10240 }, 12, MemoryChunkType::Large, 131072},
 	{{ 10241, 11264 }, 11, MemoryChunkType::Large, 131072},
 	{{ 11265, 12288 }, 10, MemoryChunkType::Large, 131072},
-	{{ 12289, 13312 }, 9, MemoryChunkType::Large, 131072},
-	{{ 13313, 14336 }, 9, MemoryChunkType::Large, 131072},
-	{{ 14337, 15360 }, 8, MemoryChunkType::Large, 131072},
-	{{ 15361, 16384 }, 8, MemoryChunkType::Large, 131072},
+	{{ 12289, 13312 }, 9, MemoryChunkType::Large, 131072},		 //mergeA
+	{{ 13313, 14336 }, 9, MemoryChunkType::Large, 131072},		 // mergeB
+	{{ 14337, 15360 }, 8, MemoryChunkType::Large, 131072},		 //mergeA
+	{{ 15361, 16384 }, 8, MemoryChunkType::Large, 131072},		 // mergeB
 	{{16385, size_t(-1)}, 1, MemoryChunkType::AnySize,-1}
 };
 

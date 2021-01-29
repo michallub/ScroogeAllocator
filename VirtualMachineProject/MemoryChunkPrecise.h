@@ -2,17 +2,16 @@
 #include "MemoryChunkBase.h"
 #include "MemoryBitfieldManager.h"
 
-template<class MemoryManagerType>
 class MemoryChunkPrecise :
-	public MemoryChunkBase< MemoryManagerType>
+	public MemoryChunkBase
 {
     MemoryBitfieldManager<64> bitfields;
     size_t elementSize;
 
 
 public:
-	MemoryChunkPrecise(MemoryManagerType& memorymanager, size_t memorysize, size_t elementSize, size_t elementCount) :
-		MemoryChunkBase< MemoryManagerType>(memorymanager, memorysize), elementSize(elementSize) {
+	MemoryChunkPrecise(MemoryCustomAllocator& memoryallocs, size_t memorysize, size_t elementSize, size_t elementCount) :
+		MemoryChunkBase(memoryallocs, memorysize), elementSize(elementSize) {
 		
 		bitfields.setElementCount(elementCount);
 
@@ -33,7 +32,7 @@ public:
 
 		return this->chunk + elementSize * index;
 	}
-	virtual DealocResult dealloc(uint8_t* ptr)
+	DealocResult dealloc(uint8_t* ptr) override
 	{
 		auto wasfull = full();
 		auto addr = (uint8_t*)ptr - this->chunk;
@@ -43,6 +42,23 @@ public:
 		auto result = bitfields.DeallocIndex(index);
 		this->useCount--;
 		return result;
+	}
+	MemoryMemInfo getInfo(uint8_t* ptr) const noexcept override {
+		auto addr = (uint8_t*)ptr - this->chunk;
+		if (addr < 0 || addr >= this->memorysize)
+			return MemoryMemInfo();
+		size_t index = addr / elementSize;
+		MemoryMemInfo info;
+		info.buferAddress = chunk + index* elementSize;
+		info.chunkAddress = chunk;
+		info.chunkSize = memorysize;
+		info.allocatedSize = elementSize;
+		if (bitfields.isAllocated(index))
+		{
+			info.isAllocated = true;
+			info.requestedSize = elementSize;
+		}
+		return info;
 	}
 };
 

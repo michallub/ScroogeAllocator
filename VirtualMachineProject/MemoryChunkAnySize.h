@@ -2,14 +2,13 @@
 #include "MemoryChunkBase.h"
 #include <cassert>
 
-template<class MemoryManagerType>
 class MemoryChunkAnySize :
-    public MemoryChunkBase<MemoryManagerType>
+    public MemoryChunkBase
 {
 	size_t elementSize;
 public:
-	MemoryChunkAnySize(MemoryManagerType& memoryPool, size_t memorysize) :
-		MemoryChunkBase< MemoryManagerType>(memoryPool, memorysize), elementSize(memorysize)
+	MemoryChunkAnySize(MemoryCustomAllocator& memoryallocs, size_t memorysize) :
+		MemoryChunkBase(memoryallocs, memorysize), elementSize(memorysize)
 	{
 
 	}
@@ -39,6 +38,24 @@ public:
 		}
 		return DealocResult::BAD_ADDRESS;
 	}
+	MemoryMemInfo getInfo(uint8_t* ptr) const noexcept override {
+		auto addr = (uint8_t*)ptr - this->chunk;
+		if (addr < 0 || addr >= this->memorysize)
+			return MemoryMemInfo();
+		size_t index = addr / elementSize;
+		MemoryMemInfo info;
+		info.buferAddress = chunk + index * elementSize;
+		info.chunkAddress = chunk;
+		info.chunkSize = memorysize;
+		info.allocatedSize = memorysize;
+		if (!this->empty())
+		{
+			info.isAllocated = true;
+			info.requestedSize = elementSize;
+		}
+		return info;
+	}
+
 	~MemoryChunkAnySize() = default;
 	size_t elSize() const noexcept override {
 		return this->memorysize;

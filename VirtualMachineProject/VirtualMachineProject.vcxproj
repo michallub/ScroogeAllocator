@@ -144,6 +144,7 @@
       <Optimization>MaxSpeed</Optimization>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <OpenMPSupport>true</OpenMPSupport>
+      <AdditionalOptions>/LARGEADDRESSAWARE %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -154,16 +155,23 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="MemoryAllocatorBase.cpp" />
+    <ClCompile Include="MemoryAllocatorLight.cpp" />
+    <ClCompile Include="MemoryAllocatorMalloc.cpp" />
     <ClCompile Include="MemoryBitfieldManager.cpp" />
+    <ClCompile Include="MemoryBucket.cpp" />
     <ClCompile Include="MemoryChunkAnySize.cpp" />
     <ClCompile Include="MemoryChunkBase.cpp" />
     <ClCompile Include="MemoryChunkPool.cpp" />
     <ClCompile Include="MemoryChunkPoolAllocator.cpp" />
     <ClCompile Include="MemoryChunkPrecise.cpp" />
     <ClCompile Include="MemoryChunkVerySmall.cpp" />
+    <ClCompile Include="MemoryCustomAllocator.cpp" />
+    <ClCompile Include="MemoryCustomList.cpp" />
     <ClCompile Include="MemoryManager.cpp" />
     <ClCompile Include="MemoryManagerBase.cpp" />
     <ClCompile Include="MemoryManagerParallel.cpp" />
+    <ClCompile Include="MemoryPoolAllocator.cpp" />
     <ClCompile Include="MemoryPoolAllocatorInterface.cpp" />
     <ClCompile Include="MemoryRange.cpp" />
     <ClCompile Include="MemorySpinlock.cpp" />
@@ -175,16 +183,23 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DealocResult.h" />
+    <ClInclude Include="MemoryAllocatorBase.h" />
+    <ClInclude Include="MemoryAllocatorLight.h" />
+    <ClInclude Include="MemoryAllocatorMalloc.h" />
     <ClInclude Include="MemoryBitfieldManager.h" />
+    <ClInclude Include="MemoryBucket.h" />
     <ClInclude Include="MemoryChunkAnySize.h" />
     <ClInclude Include="MemoryChunkBase.h" />
     <ClInclude Include="MemoryChunkPool.h" />
     <ClInclude Include="MemoryChunkPoolAllocator.h" />
     <ClInclude Include="MemoryChunkPrecise.h" />
     <ClInclude Include="MemoryChunkVerySmall.h" />
+    <ClInclude Include="MemoryCustomAllocator.h" />
+    <ClInclude Include="MemoryCustomList.h" />
     <ClInclude Include="MemoryManager.h" />
     <ClInclude Include="MemoryManagerBase.h" />
     <ClInclude Include="MemoryManagerParallel.h" />
+    <ClInclude Include="MemoryPoolAllocator.h" />
     <ClInclude Include="MemoryPoolAllocatorInterface.h" />
     <ClInclude Include="MemoryRange.h" />
     <ClInclude Include="MemorySizeRanges.h" />
@@ -194,6 +209,10 @@
     <ClInclude Include="VMMemory.h" />
     <ClInclude Include="VMPointer.h" />
     <ClInclude Include="WastedBytesCounter.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ClassDiagram.cd" />
+    <None Include="ClassDiagram1.cd" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
