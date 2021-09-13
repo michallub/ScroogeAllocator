@@ -18,6 +18,11 @@ struct SplitType {
 	uint8_t fullChilds : 6;
 };
 
+constexpr uint32_t shiftLeft(uint32_t a, size_t b) noexcept
+{
+	return (b <= 32) ? (a << b) : 0;
+}
+
 template<size_t SIZE>
 struct SplitLeaf 
 {
@@ -44,7 +49,7 @@ struct SplitLeaf
 	}
 	static constexpr uint32_t getMaxSplit() noexcept
 	{
-		return uint32_t(1) << (size()-1);
+		return shiftLeft(1, size() - 1);// uint32_t(1) << (size() - 1);
 	}
 
 	size_t deallocIndex(size_t index) noexcept {
@@ -603,9 +608,12 @@ using Split84 = SplitMiddle<84, Split21, 4, Split28, 3>;		//
 using Split100 = SplitMiddle<100, Split20, 5, Split25, 4>;		//
 
 
-
-
-
+//Split72 aksjdhfkjsd;
+//
+//constexpr auto asdlkjasdklsdv = aksjdhfkjsd.getMaxSplit();
+//constexpr auto qwue72 = Split72::getMaxSplit();
+//constexpr auto qwue18 = Split18::getMaxSplit();
+//constexpr auto qwue24 = Split24::getMaxSplit();
 
 struct SplitTypes {
 

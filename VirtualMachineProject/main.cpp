@@ -138,7 +138,7 @@ int main() {
 
 
 
-	omp_set_num_threads(0);
+	omp_set_num_threads(16);
 	using LockType = MemorySpinlock;
 	//using LockType = std::mutex;
 
